@@ -1,0 +1,8 @@
+# Node / SDK build artifacts
+sdk-react-native/
+**/node_modules/
+**/dist/
+
+# Python
+__pycache__/
+.env

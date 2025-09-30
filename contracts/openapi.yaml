@@ -1,0 +1,84 @@
+openapi: 3.0.1
+info:
+  title: Agentic AI Search API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8000
+paths:
+  /search:
+    post:
+      summary: Search products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+  /products/{sku}:
+    get:
+      summary: Get product by SKU
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: product
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+  /diag/{qid}:
+    get:
+      summary: Get diagnostics by query id
+      parameters:
+        - in: path
+          name: qid
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: diagnostics object
+          content:
+            application/json:
+              schema:
+                type: object
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        sku: { type: string }
+        name: { type: string }
+        price: { type: number }
+        currency: { type: string }
+        thumbnail: { type: string }
+        score: { type: number }
+        description: { type: string }
+    SearchRequest:
+      type: object
+      properties:
+        query: { type: string }
+        locale: { type: string }
+        currency: { type: string }
+        filters: { type: object }
+        paging:
+          type: object
+          properties:
+            page: { type: integer }
+            size: { type: integer }
+    SearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/Product' }
+        diagnostics: { type: object }
