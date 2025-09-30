@@ -20,8 +20,9 @@ jobs:
 
       - name: Install backend dependencies
         run: |
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install requests
+
 
       - name: Run backend tests
         run: |
@@ -45,3 +46,4 @@ jobs:
         with:
           name: react-native-sdk
           path: sdk/react-native
+      
