@@ -1,5 +1,5 @@
 fastapi
 uvicorn
 pydantic
-sentence-transformers
-pinecone
+openai>=1.0.0
+pinecone-client

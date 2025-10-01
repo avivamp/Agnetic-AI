@@ -1,33 +1,39 @@
 import os
-from sentence_transformers import SentenceTransformer
+from openai import OpenAI
 from pinecone import Pinecone
 
-# Config
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "pcsk_4VBUYR_FxWc6NekokadYpMEcXY6W95PhWQBCTpAHgVZ7kb5NZ2bCAAjfcE9wX7AEsYRF4T")
-INDEX_NAME = "products-airlinex"
+# Initialize clients
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))  # already in your env
 
-# Init Pinecone + HuggingFace model once
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index(INDEX_NAME)
-model = SentenceTransformer("all-MiniLM-L6-v2")
+INDEX_NAME = "products-index"
 
-async def search_products(query: str, top_k: int = 5):
-    # Convert query to embedding
-    embedding = model.encode([query])[0].tolist()
+def get_embedding(text: str) -> list[float]:
+    """Call OpenAI API to get embeddings"""
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=text
+    )
+    return response.data[0].embedding
+
+def search_products(query: str, top_k: int = 5):
+    """Search Pinecone using OpenAI embeddings"""
+    # Get query vector
+    vector = get_embedding(query)
 
     # Query Pinecone
-    results = index.query(vector=embedding, top_k=top_k, include_metadata=True)
+    index = pc.Index(INDEX_NAME)
+    results = index.query(
+        vector=vector,
+        top_k=top_k,
+        include_metadata=True
+    )
 
-    # Format results
-    items = []
-    for match in results["matches"]:
-        items.append({
+    return [
+        {
             "id": match["id"],
             "score": match["score"],
-            "name": match["metadata"]["name"],
-            "category": match["metadata"]["category"],
-            "price": match["metadata"]["price"],
-            "description": match["metadata"]["description"]
-        })
-
-    return {"query": query, "results": items}
+            "metadata": match["metadata"]
+        }
+        for match in results["matches"]
+    ]
