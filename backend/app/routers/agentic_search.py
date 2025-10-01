@@ -8,11 +8,14 @@ router = APIRouter()
 class AgenticSearchRequest(BaseModel):
     query: str
     merchant_id: Optional[str] = None
+    limit: Optional[int] = 10
+    offset: Optional[int] = 0
 
 @router.post("/agentic-search")
 async def agentic_search(request: AgenticSearchRequest):
-    results = search_products_nl(
+    return search_products_nl(
         nl_query=request.query,
-        merchant_id=request.merchant_id
+        merchant_id=request.merchant_id,
+        limit=request.limit,
+        offset=request.offset
     )
-    return results
