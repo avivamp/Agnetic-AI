@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import search
+from .routers import search, agentic_search
 
 app = FastAPI(title="Agentic AI Search API", version="0.1.0")
 
@@ -14,6 +14,7 @@ app.add_middleware(
 )
 
 app.include_router(search.router)
+app.include_router(agentic_search.router)
 
 
 @app.get("/")
