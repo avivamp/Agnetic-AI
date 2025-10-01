@@ -4,7 +4,15 @@ from pinecone import Pinecone
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-INDEX_NAME = os.getenv("PINECONE_INDEX", "products-airlinex")
+
+# merchant → index mapping
+INDEX_MAP = {
+    "airlinex": "products-airlinex",
+    "default": "products-index"
+}
+
+def get_index_name(merchant_id: str):
+    return INDEX_MAP.get(merchant_id, INDEX_MAP["default"])
 
 def get_embedding(text: str) -> list[float]:
     response = client.embeddings.create(
@@ -15,7 +23,8 @@ def get_embedding(text: str) -> list[float]:
 
 def search_products(query: str, top_k: int = 5, filters=None, merchant_id=None):
     vector = get_embedding(query)
-    index = pc.Index(INDEX_NAME)
+    index_name = get_index_name(merchant_id)
+    index = pc.Index(index_name)
 
     pinecone_query = {
         "vector": vector,
