@@ -1,82 +1,102 @@
 import os
-import json
 import logging
-from openai import OpenAI
-from app.services.search_service import get_embedding, get_index_name, pc
+import openai
+from app.services.search_service import pc, get_embedding, get_index_name
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("app.services.agentic_service")
+logger.setLevel(logging.INFO)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def extract_filters_with_llm(nl_query: str) -> dict:
+# Only allow these filters to be applied
+VALID_FILTER_KEYS = {"category", "brand", "price"}
+
+
+async def extract_filters_with_llm(query: str) -> dict:
+    """Ask LLM to extract structured filters from natural language query."""
+    prompt = f"""
+    Extract filters from this shopping search query. 
+    Allowed keys: category, brand, price_min, price_max.
+    If price range is given, output both min and max. 
+    Return JSON only.
+
+    Query: {query}
     """
-    Use GPT-4o-mini to extract structured filters from natural language.
-    """
-    system_prompt = """
-    You are a product search parser. 
-    Convert natural language product queries into a JSON object of filters.
-    Supported fields: category, brand, notes, use_case, price (with $gte/$lte).
-    Use lowercase keys. Omit fields if not present.
-    Respond ONLY with valid JSON, no extra text.
-    """
 
-    logger.info(f"[AgenticSearch] Extracting filters for query: {nl_query}")
+    logger.info(f"[AgenticSearch] Extracting filters for query: {query}")
 
-    response = client.chat.completions.create(
+    response = openai.ChatCompletion.create(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": nl_query}
-        ],
+        messages=[{"role": "user", "content": prompt}],
         temperature=0
     )
 
     try:
-        filters = json.loads(response.choices[0].message.content.strip())
-        logger.info(f"[AgenticSearch] LLM-extracted filters: {filters}")
+        filters = eval(response["choices"][0]["message"]["content"])
     except Exception as e:
-        logger.error(f"[AgenticSearch] Failed to parse filters: {e}")
+        logger.warning(f"[AgenticSearch] Failed to parse filters: {e}")
         filters = {}
 
+    logger.info(f"[AgenticSearch] LLM-extracted filters: {filters}")
     return filters
 
-def search_products_nl(nl_query: str, merchant_id: str, limit: int = 10, offset: int = 0):
-    # 1. Extract filters with LLM
-    filters = extract_filters_with_llm(nl_query)
 
-    # 2. Generate embedding
+async def search_products_nl(query: str, merchant_id: str, offset: int = 0, limit: int = 10):
+    """Perform natural language search with embeddings + Pinecone + filters."""
+    # Step 1: Extract filters
+    filters = await extract_filters_with_llm(query)
+
+    # Step 2: Keep only valid filters
+    structured_filter = {}
+    if "category" in filters:
+        structured_filter["category"] = filters["category"]
+    if "brand" in filters:
+        structured_filter["brand"] = filters["brand"]
+    if "price_min" in filters or "price_max" in filters:
+        structured_filter["price"] = {}
+        if "price_min" in filters:
+            structured_filter["price"]["$gte"] = filters["price_min"]
+        if "price_max" in filters:
+            structured_filter["price"]["$lte"] = filters["price_max"]
+
+    logger.info(f"[AgenticSearch] Structured filters applied: {structured_filter}")
+
+    # Step 3: Generate embedding
     logger.info("[AgenticSearch] Generating embedding...")
-    vector = get_embedding(nl_query)
+    query_embedding = get_embedding(query)
 
-    # 3. Select Pinecone index based on merchant
+    # Step 4: Choose merchant-specific Pinecone index
     index_name = get_index_name(merchant_id)
-    logger.info(f"[AgenticSearch] Using Pinecone index: {index_name}")
     index = pc.Index(index_name)
 
-    # 4. Query Pinecone with pagination
+    # Step 5: Query Pinecone with filters
     pinecone_query = {
-        "vector": vector,
-        "top_k": limit + offset,  # fetch extra, then slice manually
-        "include_metadata": True,
+        "vector": query_embedding,
+        "top_k": offset + limit,
+        "include_metadata": True
     }
-    if filters:
-        pinecone_query["filter"] = filters
+    if structured_filter:
+        pinecone_query["filter"] = structured_filter
 
     logger.info(f"[AgenticSearch] Pinecone query params: {pinecone_query}")
 
     results = index.query(**pinecone_query)
     matches = results.get("matches", [])[offset: offset + limit]
 
-    logger.info(f"[AgenticSearch] Retrieved {len(matches)} results after pagination")
+    # Step 6: Fallback if no results
+    if not matches and "filter" in pinecone_query:
+        logger.warning("[AgenticSearch] No results with filters. Retrying without filters...")
+        pinecone_query.pop("filter")
+        results = index.query(**pinecone_query)
+        matches = results.get("matches", [offset: offset + limit])
 
-    # 5. Return structured response
+    # Step 7: Log sample product metadata
+    if matches:
+        logger.info(f"[AgenticSearch] Example result metadata: {matches[0]['metadata']}")
+    else:
+        logger.warning("[AgenticSearch] Still 0 results after fallback.")
+
     return {
-        "interpreted_filters": filters,
-        "pagination": {"limit": limit, "offset": offset, "total_fetched": len(matches)},
-        "results": [
-            {"id": m["id"], "score": m["score"], "metadata": m["metadata"]}
-            for m in matches
-        ]
+        "interpreted_filters": structured_filter,
+        "results": matches
     }
