@@ -6,7 +6,7 @@ from pinecone import Pinecone
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))  # already in your env
 
-INDEX_NAME = "products-index"
+INDEX_NAME = "products-airlinex"
 
 def get_embedding(text: str) -> list[float]:
     """Call OpenAI API to get embeddings"""
