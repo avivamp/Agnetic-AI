@@ -6,7 +6,7 @@ from app.services.search_service import pc, get_embedding, get_index_name
 logger = logging.getLogger("app.services.agentic_service")
 logger.setLevel(logging.INFO)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Only allow these filters to be applied
 VALID_FILTER_KEYS = {"category", "brand", "price"}
@@ -25,7 +25,6 @@ async def extract_filters_with_llm(query: str) -> dict:
 
     logger.info(f"[AgenticSearch] Extracting filters for query: {query}")
 
-    client = OpenAI()
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
