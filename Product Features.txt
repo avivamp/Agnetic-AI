@@ -1,0 +1,3 @@
+List of Product Features:
+1. Natural Langugage Search
+2. Product ranking based on personalization signals
