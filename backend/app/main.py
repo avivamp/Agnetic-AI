@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from logging_config import setup_logging
+from app.logging_config import setup_logging
 
 # Setup logging before anything else
 setup_logging()
