@@ -1,3 +1,4 @@
 List of Product Features:
 1. Natural Langugage Search
-2. Product ranking based on personalization signals
+2. Filters (Product Category, Price, Brand) & Pagination (Limit & Offset)
+3. Product ranking based on personalization signals (Trip, Cabin Class, Loyalty Tier, User Profile, Time till Departure)
