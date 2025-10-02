@@ -15,7 +15,7 @@ CATEGORIES = [
     "Luxury Goods"
 ]
 
-client = OpenAI(api_key="sk")
+client = OpenAI(api_key="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")
 
 def get_embedding(text: str, model="text-embedding-3-small"):
     """Fetch embedding from OpenAI."""
