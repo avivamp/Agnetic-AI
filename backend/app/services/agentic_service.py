@@ -88,7 +88,7 @@ async def search_products_nl(query: str, merchant_id: str, offset: int = 0, limi
         logger.warning("[AgenticSearch] No results with filters. Retrying without filters...")
         pinecone_query.pop("filter")
         results = index.query(**pinecone_query)
-        matches = results.get("matches", [offset: offset + limit])
+        matches = results.get("matches", [])[offset: offset + limit]
 
     # Step 7: Log sample product metadata
     if matches:
