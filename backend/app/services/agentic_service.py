@@ -1,6 +1,6 @@
 import os
 import logging
-import openai
+from openai import OpenAI
 from app.services.search_service import pc, get_embedding, get_index_name
 
 logger = logging.getLogger("app.services.agentic_service")
@@ -25,7 +25,8 @@ async def extract_filters_with_llm(query: str) -> dict:
 
     logger.info(f"[AgenticSearch] Extracting filters for query: {query}")
 
-    response = openai.ChatCompletion.create(
+    client = OpenAI()
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0
