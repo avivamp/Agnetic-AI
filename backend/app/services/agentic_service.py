@@ -111,11 +111,19 @@ async def search_products_nl(query: str, merchant_id: str, offset: int = 0, limi
 
     # Step 7: Log sample product metadata
     if matches:
-        logger.info(f"[AgenticSearch] Example result metadata: {matches[0]['metadata']}")
+        logger.info(f"[AgenticSearch] Example result metadata: {matches[0].get('metadata', {})}")
     else:
         logger.warning("[AgenticSearch] Still 0 results after fallback.")
 
+    # Step 8: Return safe JSON serializable response
     return {
-        "interpreted_filters": structured_filter,
-        "results": matches
+        "interpreted_filters": json.loads(json.dumps(structured_filter)),  # safe dict
+        "results": [
+            {
+                "id": match.get("id"),
+                "score": match.get("score"),
+                "metadata": match.get("metadata", {})
+            }
+            for match in matches
+        ]
     }
