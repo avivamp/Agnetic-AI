@@ -8,7 +8,7 @@ pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 # merchant → index mapping
 INDEX_MAP = {
     "airlinex": "products-airlinex",
-    "default": "products-index"
+    "default": "products-airlinex"
 }
 
 def get_index_name(merchant_id: str):
