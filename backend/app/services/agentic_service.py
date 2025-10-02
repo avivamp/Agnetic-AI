@@ -9,7 +9,6 @@ from pydantic import BaseModel, ValidationError
 from openai import OpenAI
 from app.services.search_service import pc, get_embedding, get_index_name
 from app.config.category_embeddings import CATEGORY_EMBEDDINGS
-from app.routers.metrics import log_query
 from app.models.search_log import SearchLog
 
 logger = logging.getLogger("app.services.agentic_service")
@@ -86,7 +85,7 @@ async def extract_filters_with_llm(query: str) -> dict:
 
 async def search_products_nl(query: str, merchant_id: str, db: AsyncSession, offset: int = 0, limit: int = 10):
     """Perform natural language search with embeddings + Pinecone + filters."""
-    log_query(query)
+    logger.info(f"[Metrics] Query: {query}")
     
     # Step 1: Extract filters (safe fallback)
     filters = await extract_filters_with_llm(query)
