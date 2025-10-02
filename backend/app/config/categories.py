@@ -6,5 +6,8 @@ CATEGORIES = [
     "Electronics",
     "Comfort",
     "Food & Beverage",
-    "Duty Free"
+    "Connectivity",
+    "Travel Essentials",
+    "Baby & Kids",
+    "Luxury Goods"
 ]
