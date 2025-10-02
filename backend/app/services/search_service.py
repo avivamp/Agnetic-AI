@@ -1,6 +1,8 @@
 import os
+import json
 from openai import OpenAI
 from pinecone import Pinecone
+
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
@@ -33,6 +35,10 @@ def search_products(query: str, top_k: int = 5, filters=None, merchant_id=None):
     }
     if filters:
         pinecone_query["filter"] = filters
+
+    # Log without dumping the whole embedding vector
+    query_log = {**pinecone_query, "vector": f"[{len(vector)}-dim embedding]"}
+    logger.info(f"[Pinecone Query] {json.dumps(query_log, indent=2)}")
 
     results = index.query(**pinecone_query)
 
