@@ -1,6 +1,11 @@
 from fastapi import FastAPI
+from logging_config import setup_logging
+
+# Setup logging before anything else
+setup_logging()
+
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import search, agentic_search
+from .routers import search, agentic_search  # import after logging is set
 
 app = FastAPI(title="Agentic AI Search API", version="0.1.0")
 
