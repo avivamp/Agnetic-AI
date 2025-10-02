@@ -6,7 +6,7 @@ from typing import Optional
 from pydantic import BaseModel, ValidationError
 from openai import OpenAI
 from app.services.search_service import pc, get_embedding, get_index_name
-from app.config.categories import CATEGORIES   # ✅ externalised categories
+from app.config.category_embeddings import CATEGORY_EMBEDDINGS
 
 logger = logging.getLogger("app.services.agentic_service")
 logger.setLevel(logging.INFO)
@@ -24,12 +24,11 @@ class FilterSchema(BaseModel):
 
 
 def best_category(query: str) -> str:
-    """Find the most relevant category by embedding similarity."""
+    """Find most relevant category by cosine similarity with precomputed embeddings."""
     q_vec = get_embedding(query)
     best_cat, best_sim = None, -1
 
-    for cat in CATEGORIES:
-        c_vec = get_embedding(cat)
+    for cat, c_vec in CATEGORY_EMBEDDINGS.items():
         sim = np.dot(q_vec, c_vec) / (np.linalg.norm(q_vec) * np.linalg.norm(c_vec))
         if sim > best_sim:
             best_cat, best_sim = cat, sim
