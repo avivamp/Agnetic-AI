@@ -1,0 +1,102 @@
+✅ Completed
+
+Phase 1 → Agentic AI search assistant inside airline mobile app, helping customers find products quickly.
+
+Phase 2 → Added personalization (basic trip/loyalty context), logging, monitoring, QA, and stronger SDK/API package.
+
+🎯 Next Phases (Future Roadmap)
+Phase 3 – Context-Aware & Bundling (2–3 sprints)
+
+Goal: Move from “search assistant” → “travel shopping concierge.”
+
+AI uses context: route, destination, time-to-departure, season.
+
+Recommends bundles: e.g., “Flying to Paris? Add Wi-Fi + SIM card + wine gift bundle.”
+
+Dynamic business rules (high-margin items get surfaced).
+
+Airline app still handles payment & checkout (deep links).
+
+Product Increment:
+
+Context enrichment module in API.
+
+Bundle engine (group complementary products).
+
+A/B test in demo app: context-aware vs. generic search.
+
+Phase 4 – Loyalty & Payments Integration (3–4 sprints)
+
+Goal: Start making AI part of the checkout experience.
+
+AI shows which products can be redeemed via miles/points.
+
+Supports multi-currency price display (cash + miles mix).
+
+Introduce IATA Pay / alt-payment support (if airline agrees).
+
+Product Increment:
+
+Loyalty API connector (tokenized, read-only).
+
+Price enrichment engine (miles, points, mixed).
+
+Deep links extended with loyalty redemption flags.
+
+Phase 5 – Agentic Orchestration (4–6 sprints)
+
+Goal: Make AI an active orchestrator beyond catalog search.
+
+Handles order reservation (hold item until flight).
+
+Reacts to flight status changes (delays, cancellations → adjusts pickup/delivery).
+
+Talks to multiple partners (duty-free, transport, hotels).
+
+Product Increment:
+
+Airline-hosted connector (read-only PSS / inventory sync).
+
+Event-driven triggers (flight delay → update retail orders).
+
+Fulfillment webhooks with partner retailers.
+
+Phase 6 – Open Marketplace & Airline Revenue Model (ongoing)
+
+Goal: Make AeroShop a B2B2C marketplace layer.
+
+Third-party brands plug into AeroShop (not just airline catalog).
+
+AI orchestrates across multiple merchants → bigger revenue share for airline.
+
+Airlines get commission dashboards & analytics.
+
+Product Increment:
+
+Marketplace API for partners.
+
+Airline analytics dashboard (conversion, commissions).
+
+SKU onboarding pipeline for partners.
+
+📊 Suggested Immediate Next Step (Post Phase-2)
+
+👉 Begin Phase 3: Context-Aware Bundling in the test pre-flight app.
+
+Show management how AI can now proactively suggest bundles instead of just reactive search.
+
+This moves you from “AI as search” → “AI as upsell driver.”
+
+🔄 Recap Roadmap in Simple Terms
+
+Phase 1: AI search bar → find product easily.
+
+Phase 2: AI knows me → personalized suggestions.
+
+Phase 3: AI knows my trip → contextual bundles.
+
+Phase 4: AI helps me pay → loyalty + alt payments.
+
+Phase 5: AI manages my journey → orchestrates orders.
+
+Phase 6: AI runs a marketplace → new airline revenue streams.
