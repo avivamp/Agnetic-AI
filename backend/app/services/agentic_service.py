@@ -5,6 +5,7 @@ from typing import Optional
 from pydantic import BaseModel, ValidationError
 from openai import OpenAI
 from app.services.search_service import pc, get_embedding, get_index_name
+from app.config.categories import CATEGORIES   # ✅ imported here
 
 logger = logging.getLogger("app.services.agentic_service")
 logger.setLevel(logging.INFO)
@@ -24,10 +25,16 @@ class FilterSchema(BaseModel):
 async def extract_filters_with_llm(query: str) -> dict:
     """Ask LLM to extract structured filters from natural language query."""
     prompt = f"""
-    Extract filters from this shopping search query.
-    Allowed keys: category, brand, price_min, price_max.
-    If price range is given, output both min and max.
-    Return strictly in JSON format only.
+    You are a shopping assistant. 
+    Extract filters from the search query and map them to structured JSON.
+
+    Rules:
+    - Allowed keys: category, brand, price_min, price_max
+    - For "category", you MUST choose the closest match from this list only:
+      {CATEGORIES}
+    - If query mentions "perfume" or "cologne", map to "Fragrance & Beauty".
+    - If no category is clear, omit it.
+    - Return only valid JSON.
 
     Query: {query}
     """
