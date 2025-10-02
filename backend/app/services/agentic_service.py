@@ -2,12 +2,15 @@ import os
 import logging
 import json
 import numpy as np
+import time
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from pydantic import BaseModel, ValidationError
 from openai import OpenAI
 from app.services.search_service import pc, get_embedding, get_index_name
 from app.config.category_embeddings import CATEGORY_EMBEDDINGS
 from app.routers.metrics import log_query
+from app.models.search_log import SearchLog
 
 logger = logging.getLogger("app.services.agentic_service")
 logger.setLevel(logging.INFO)
@@ -81,7 +84,7 @@ async def extract_filters_with_llm(query: str) -> dict:
     return filters
 
 
-async def search_products_nl(query: str, merchant_id: str, offset: int = 0, limit: int = 10):
+async def search_products_nl(query: str, merchant_id: str, db: AsyncSession, offset: int = 0, limit: int = 10):
     """Perform natural language search with embeddings + Pinecone + filters."""
     log_query(query)
     
@@ -120,18 +123,19 @@ async def search_products_nl(query: str, merchant_id: str, offset: int = 0, limi
     if structured_filter:
         pinecone_query["filter"] = structured_filter
 
-    # Replace vector with placeholder before logging
-    query_log = dict(pinecone_query)
-    if "vector" in query_log:
-        query_log["vector"] = f"[{len(query_log['vector'])}-dim embedding]"
+    # Log params safely
+    qlog = dict(pinecone_query)
+    qlog["vector"] = f"[{len(query_embedding)}-dim embedding]"
+    logger.info(f"[AgenticSearch] Pinecone query params: {json.dumps(qlog, indent=2)}")
 
-    logger.info(f"[AgenticSearch] Pinecone query params: {json.dumps(query_log, indent=2)}")
-
+    # Measure latency
+    start = time.time()
     try:
         results = index.query(**pinecone_query)
     except Exception as e:
         logger.error(f"[AgenticSearch] Pinecone query failed: {e}")
         return {"interpreted_filters": {}, "results": []}
+    duration = int((time.time() - start) * 1000)
 
     matches = results.get("matches", [])[offset: offset + limit]
 
@@ -142,13 +146,33 @@ async def search_products_nl(query: str, merchant_id: str, offset: int = 0, limi
         results = index.query(**pinecone_query)
         matches = results.get("matches", [])[offset: offset + limit]
 
-    # Step 7: Log sample product metadata
+    # Step 7: Extract top result info
+    top_result_id, top_result_score = None, None
     if matches:
+        top_result_id = matches[0].get("id")
+        top_result_score = matches[0].get("score")
         logger.info(f"[AgenticSearch] Example result metadata: {matches[0].get('metadata', {})}")
     else:
         logger.warning("[AgenticSearch] Still 0 results after fallback.")
 
-    # Step 8: Return safe JSON serializable response
+    # Step 8: Save log in Supabase (via SQLAlchemy model)
+    log = SearchLog(
+        merchant_id=merchant_id,
+        session_id="demo-session",   # you can later replace with real session tracking
+        query=query,
+        query_embedding=query_embedding,   # JSONB in table
+        latency_ms=duration,
+        results_count=len(results.get("matches", [])),
+        top_result_id=top_result_id,
+        top_result_score=top_result_score,
+        error_flag=False,
+        client_type="mobile_app",
+        country="UAE"
+    )
+    db.add(log)
+    await db.commit()
+
+    # Step 9: Return safe JSON serializable response
     return {
         "interpreted_filters": json.loads(json.dumps(structured_filter)),  # safe dict
         "results": [
