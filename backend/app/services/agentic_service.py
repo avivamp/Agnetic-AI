@@ -99,7 +99,12 @@ async def search_products_nl(query: str, merchant_id: str, offset: int = 0, limi
     if structured_filter:
         pinecone_query["filter"] = structured_filter
 
-    logger.info(f"[AgenticSearch] Pinecone query params: {pinecone_query}")
+    # Replace vector with a placeholder before logging
+    query_log = dict(pinecone_query)
+    if "vector" in query_log:
+    query_log["vector"] = f"[{len(query_log['vector'])}-dim embedding]"
+
+    logger.info(f"[AgenticSearch] Pinecone query params: {json.dumps(query_log, indent=2)}")
 
     try:
         results = index.query(**pinecone_query)
