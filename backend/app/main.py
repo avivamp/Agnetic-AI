@@ -6,7 +6,7 @@ setup_logging()
 
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.logging import LoggingMiddleware
-from .routers import search, agentic_search  # import after logging is set
+from .routers import search, agentic_search, metrics  # import after logging is set
 
 app = FastAPI(title="Agentic AI Search API", version="0.1.0")
 app.add_middleware(LoggingMiddleware)
