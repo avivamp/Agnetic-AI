@@ -4,11 +4,11 @@ import json
 import numpy as np
 import time
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, ValidationError
 from openai import OpenAI
 from app.services.search_service import pc, get_embedding, get_index_name
-from app.config.category_embeddings import CATEGORY_EMBEDDINGS
+from app.config.categories import CATEGORY_EMBEDDINGS
 from app.models.search_log import SearchLog
 
 logger = logging.getLogger("app.services.agentic_service")
@@ -25,7 +25,9 @@ class FilterSchema(BaseModel):
     price_min: Optional[float] = None
     price_max: Optional[float] = None
 
-
+# ----------------------------
+# Category Mapping
+# ----------------------------
 def best_category(query: str) -> str:
     """Find most relevant category by cosine similarity with precomputed embeddings."""
     q_vec = get_embedding(query)
@@ -39,7 +41,9 @@ def best_category(query: str) -> str:
     logger.info(f"[AgenticSearch] Category mapping → {best_cat} (score={best_sim:.3f})")
     return best_cat
 
-
+# ----------------------------
+# Filter Extraction
+# ----------------------------
 async def extract_filters_with_llm(query: str) -> dict:
     """Extract brand/price filters with LLM, map category separately."""
     prompt = f"""
@@ -82,15 +86,52 @@ async def extract_filters_with_llm(query: str) -> dict:
     logger.info(f"[AgenticSearch] LLM-extracted filters (validated): {filters}")
     return filters
 
+# ----------------------------
+# Context-Aware Ranking
+# ----------------------------
+def rerank_with_context(matches, context: Dict[str, Any]):
+    """Boost results using context (cabin, loyalty, trip info)."""
+    if not context or not matches:
+        return matches
 
-async def search_products_nl(query: str, merchant_id: str, db: AsyncSession, offset: int = 0, limit: int = 10):
+    cabin = context.get("cabin")
+    loyalty = context.get("loyalty_tier")
+
+    for m in matches:
+        score_boost = 0.0
+        price = m["metadata"].get("price", 0)
+
+        # Example heuristics
+        if cabin in ["Business", "First"] and price > 100:
+            score_boost += 0.05  # prefer luxury for premium cabins
+        if loyalty in ["Gold", "Platinum"] and price > 50:
+            score_boost += 0.05  # loyal users more likely to buy premium
+
+        m["score"] += score_boost
+
+    # Sort again after boosting
+    matches.sort(key=lambda x: x["score"], reverse=True)
+    return matches
+
+# ----------------------------
+# Main Search
+# ----------------------------
+async def search_products_nl(
+        query: str, 
+        merchant_id: str, 
+        db: AsyncSession, 
+        offset: int = 0, 
+        limit: int = 10,
+        context: Optional[Dict[str, Any]] = None
+    ):
+
     """Perform natural language search with embeddings + Pinecone + filters."""
     logger.info(f"[Metrics] Query: {query}")
     
-    # Step 1: Extract filters (safe fallback)
+    # Extract filters (safe fallback)
     filters = await extract_filters_with_llm(query)
 
-    # Step 2: Build Pinecone filter structure
+    # Build Pinecone filter structure
     structured_filter = {}
     if filters.get("category"):
         structured_filter["category"] = filters["category"]
@@ -105,15 +146,29 @@ async def search_products_nl(query: str, merchant_id: str, db: AsyncSession, off
 
     logger.info(f"[AgenticSearch] Structured filters applied: {structured_filter}")
 
-    # Step 3: Generate embedding
-    logger.info("[AgenticSearch] Generating embedding...")
-    query_embedding = get_embedding(query)
+    # Enrich query with context (soft influence)
+    enriched_query = query
+    if context:
+        enrich_parts = []
+        if context.get("cabin"):
+            enrich_parts.append(f"cabin: {context['cabin']}")
+        if context.get("loyalty_tier"):
+            enrich_parts.append(f"loyalty: {context['loyalty_tier']}")
+        if context.get("trip"):
+            trip = context["trip"]
+            enrich_parts.append(f"trip from {trip.get('from')} to {trip.get('to')}")
+        enriched_query = query + " | " + ", ".join(enrich_parts)
+        logger.info(f"[AgenticSearch] Enriched query with context: {enriched_query}")
 
-    # Step 4: Choose merchant-specific Pinecone index
+    # Generate embedding
+    logger.info("[AgenticSearch] Generating embedding...")
+    query_embedding = get_embedding(enriched_query)
+
+    # Choose merchant-specific Pinecone index
     index_name = get_index_name(merchant_id)
     index = pc.Index(index_name)
 
-    # Step 5: Query Pinecone
+    # Query Pinecone
     pinecone_query = {
         "vector": query_embedding,
         "top_k": offset + limit,
@@ -137,6 +192,9 @@ async def search_products_nl(query: str, merchant_id: str, db: AsyncSession, off
     duration = int((time.time() - start) * 1000)
 
     matches = results.get("matches", [])[offset: offset + limit]
+
+    # Apply reranker
+    matches = rerank_with_context(matches, context)
 
     # Step 6: Fallback if no results with filters
     if not matches and "filter" in pinecone_query:
@@ -174,6 +232,7 @@ async def search_products_nl(query: str, merchant_id: str, db: AsyncSession, off
     # Step 9: Return safe JSON serializable response
     return {
         "interpreted_filters": json.loads(json.dumps(structured_filter)),  # safe dict
+        "context_used": context or {},
         "results": [
             {
                 "id": match.get("id"),
