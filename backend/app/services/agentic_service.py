@@ -10,6 +10,7 @@ from openai import OpenAI
 from app.services.search_service import pc, get_embedding, get_index_name
 from app.config.categories import CATEGORY_EMBEDDINGS
 from app.models.search_log import SearchLog
+from app.services.ranking_service import rank_products
 
 logger = logging.getLogger("app.services.agentic_service")
 logger.setLevel(logging.INFO)
@@ -85,33 +86,6 @@ async def extract_filters_with_llm(query: str) -> dict:
 
     logger.info(f"[AgenticSearch] LLM-extracted filters (validated): {filters}")
     return filters
-
-# ----------------------------
-# Context-Aware Ranking
-# ----------------------------
-def rerank_with_context(matches, context: Dict[str, Any]):
-    """Boost results using context (cabin, loyalty, trip info)."""
-    if not context or not matches:
-        return matches
-
-    cabin = context.get("cabin")
-    loyalty = context.get("loyalty_tier")
-
-    for m in matches:
-        score_boost = 0.0
-        price = m["metadata"].get("price", 0)
-
-        # Example heuristics
-        if cabin in ["Business", "First"] and price > 100:
-            score_boost += 0.05  # prefer luxury for premium cabins
-        if loyalty in ["Gold", "Platinum"] and price > 50:
-            score_boost += 0.05  # loyal users more likely to buy premium
-
-        m["score"] += score_boost
-
-    # Sort again after boosting
-    matches.sort(key=lambda x: x["score"], reverse=True)
-    return matches
 
 # ----------------------------
 # Main Search
@@ -193,17 +167,17 @@ async def search_products_nl(
 
     matches = results.get("matches", [])[offset: offset + limit]
 
-    # Apply reranker
-    matches = rerank_with_context(matches, context)
+    # Rank the mathes
+    matches = rank_products(matches, merchant_id, context)
 
-    # Step 6: Fallback if no results with filters
+    # Fallback if no results with filters
     if not matches and "filter" in pinecone_query:
         logger.warning("[AgenticSearch] No results with filters. Retrying without filters...")
         pinecone_query.pop("filter")
         results = index.query(**pinecone_query)
         matches = results.get("matches", [])[offset: offset + limit]
 
-    # Step 7: Extract top result info
+    # Extract top result info
     top_result_id, top_result_score = None, None
     if matches:
         top_result_id = matches[0].get("id")
