@@ -6,15 +6,19 @@ logger = logging.getLogger("app.services.ranking_service")
 
 
 def compute_merchant_boost(merchant_id, category, trip=None, cabin=None):
+    """Compute merchant-specific category and context-based boosts."""
     merchant = MERCHANT_RULES.get(merchant_id, {})
     boost = merchant.get("category_boosts", {}).get(category, 1.0)
 
     # Trip-specific boost
     if trip:
         for rule in merchant.get("trip_rules", []):
-            if trip.get("from") in rule.get("route", []) and trip.get("to") in rule.get("route", []):
-                if rule.get("boost_category") == category:
-                    boost *= rule.get("weight", 1.0)
+            if (
+                trip.get("from") in rule.get("route", [])
+                and trip.get("to") in rule.get("route", [])
+                and rule.get("boost_category") == category
+            ):
+                boost *= rule.get("weight", 1.0)
 
     # Cabin-based adjustment
     if cabin:
@@ -32,7 +36,7 @@ def ml_infer_score(item: Dict[str, Any], context: Dict[str, Any]) -> float:
 
     cabin = context.get("cabin", "").lower()
     loyalty = context.get("loyalty_tier", "").lower()
-    trip = context.get("trip", {})
+    trip = context.get("trip", {}) or {}
 
     if "business" in cabin:
         base += 0.2
@@ -51,10 +55,14 @@ def ml_infer_score(item: Dict[str, Any], context: Dict[str, Any]) -> float:
     return min(1.0, base)
 
 
-def rank_products(matches: List[Dict[str, Any]], merchant_id: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+def rank_products(matches: List[Dict[str, Any]], merchant_id: str, context: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     """Blend ML model score, merchant-defined boost, and vector similarity."""
     merchant = MERCHANT_RULES.get(merchant_id, {})
     blend_weights = merchant.get("blend_weights", {"ml": 0.6, "boost": 0.3, "similarity": 0.1})
+
+    context = context or {}
+    trip = context.get("trip") or {}
+    cabin = context.get("cabin", "")
 
     ranked = []
 
@@ -63,17 +71,19 @@ def rank_products(matches: List[Dict[str, Any]], merchant_id: str, context: Dict
         category = meta.get("category", "General")
         vector_similarity = m.get("score", 0.0)
 
+        # Compute component scores
         ml_score = ml_infer_score(m, context)
-        merchant_boost_weight = compute_merchant_boost(merchant_id, category, context.get("trip"), context.get("cabin"))
+        merchant_boost_weight = compute_merchant_boost(merchant_id, category, trip, cabin)
 
+        # Blend
         final_score = (
             blend_weights["ml"] * ml_score +
             blend_weights["boost"] * merchant_boost_weight +
             blend_weights["similarity"] * vector_similarity
         )
 
-        final_score = max(0, min(1, final_score))
-        m["rank_score"] = round(final_score, 4)
+        # Clamp and attach
+        m["rank_score"] = round(max(0.0, min(1.0, final_score)), 4)
         ranked.append(m)
 
         logger.debug(
